@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Copier Helpdesk</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 min-h-screen">
+  <div id="app" class="p-8 max-w-6xl mx-auto">
+    <div class="text-center mb-8">
+      <h1 class="text-4xl font-bold text-white mb-4">🖨️ AI Copier Helpdesk</h1>
+      <p class="text-blue-200">Search error codes and issues across all service documentation</p>
+    </div>
+
+    <!-- Search Section -->
+    <div class="bg-white/10 backdrop-blur-lg rounded-xl p-6 mb-6 border border-white/20">
+      <h2 class="text-xl font-semibold text-white mb-4">🔍 Search Issue or Error Code</h2>
+      <div class="flex gap-3">
+        <input
+          id="searchInput"
+          type="text"
+          placeholder="Enter error code (e.g., E000-0001) or describe issue..."
+          class="flex-1 px-4 py-3 rounded-lg bg-white/20 border border-white/30 text-white placeholder-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-400"
+        />
+        <button
+          id="searchBtn"
+          class="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-lg font-semibold transition"
+        >
+          Search
+        </button>
+      </div>
+    </div>
+
+    <!-- Results Section -->
+    <div id="results" class="hidden bg-white/10 backdrop-blur-lg rounded-xl p-6 border border-white/20">
+      <h2 class="text-xl font-semibold text-white mb-4">✅ Troubleshooting Results</h2>
+      <div id="resultsContent"></div>
+    </div>
+
+    <!-- Loading -->
+    <div id="loading" class="hidden text-center text-white text-lg">
+      <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
+      Searching documentation...
+    </div>
+
+    <!-- Sample Queries -->
+    <div class="mt-6 text-center">
+      <p class="text-blue-200 text-sm mb-2">Try these sample queries:</p>
+      <div class="flex flex-wrap gap-2 justify-center">
+        <button class="sample-query px-4 py-2 bg-white/10 hover:bg-white/20 text-blue-200 rounded-full text-sm transition border border-white/20">E000-0001</button>
+        <button class="sample-query px-4 py-2 bg-white/10 hover:bg-white/20 text-blue-200 rounded-full text-sm transition border border-white/20">paper jam Canon</button>
+        <button class="sample-query px-4 py-2 bg-white/10 hover:bg-white/20 text-blue-200 rounded-full text-sm transition border border-white/20">fuser temperature error</button>
+        <button class="sample-query px-4 py-2 bg-white/10 hover:bg-white/20 text-blue-200 rounded-full text-sm transition border border-white/20">SC542</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const searchInput = document.getElementById('searchInput');
+    const searchBtn = document.getElementById('searchBtn');
+    const results = document.getElementById('results');
+    const resultsContent = document.getElementById('resultsContent');
+    const loading = document.getElementById('loading');
+
+    async function search() {
+      const query = searchInput.value.trim();
+      if (!query) return;
+
+      loading.classList.remove('hidden');
+      results.classList.add('hidden');
+
+      try {
+        const response = await fetch('/api/search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query })
+        });
+
+        const data = await response.json();
+
+        if (data.error) {
+          resultsContent.innerHTML = `
+            <div class="bg-red-500/20 border border-red-500/50 rounded-lg p-4 text-red-200">
+              ⚠️ Error: ${data.error}
+            </div>
+          `;
+        } else {
+          const confidenceColor = 
+            data.confidence === 'high' ? 'bg-green-500/30 text-green-200' :
+            data.confidence === 'medium' ? 'bg-yellow-500/30 text-yellow-200' :
+            'bg-red-500/30 text-red-200';
+
+          resultsContent.innerHTML = `
+            <div class="mb-4">
+              <span class="px-3 py-1 rounded-full text-sm ${confidenceColor}">
+                ${data.confidence} confidence
+              </span>
+            </div>
+            ${data.relevantDocs?.length > 0 ? `
+              <div class="mb-4 p-3 bg-blue-500/20 rounded-lg border border-blue-400/30">
+                <div class="text-sm text-blue-200 font-semibold mb-1">Matched Documentation:</div>
+                <div class="text-blue-100">${data.relevantDocs.join(', ')}</div>
+              </div>
+            ` : ''}
+            <div class="bg-white/5 rounded-lg p-4 mb-4 border border-white/10">
+              <h3 class="text-lg font-semibold text-white mb-2">Solution Steps:</h3>
+              <div class="text-blue-100 whitespace-pre-wrap">${data.solution}</div>
+            </div>
+            ${data.additionalNotes ? `
+              <div class="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
+                <div class="font-semibold text-yellow-200 mb-1">⚠️ Additional Notes:</div>
+                <div class="text-yellow-100 text-sm">${data.additionalNotes}</div>
+              </div>
+            ` : ''}
+          `;
+        }
+
+        results.classList.remove('hidden');
+      } catch (error) {
+        resultsContent.innerHTML = `
+          <div class="bg-red-500/20 border border-red-500/50 rounded-lg p-4 text-red-200">
+            ⚠️ Error: ${error.message}
+          </div>
+        `;
+        results.classList.remove('hidden');
+      }
+
+      loading.classList.add('hidden');
+    }
+
+    searchBtn.addEventListener('click', search);
+    searchInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') search();
+    });
+
+    document.querySelectorAll('.sample-query').forEach(btn => {
+      btn.addEventListener('click', () => {
+        searchInput.value = btn.textContent;
+        search();
+      });
+    });
+  </script>
+</body>
+</html>
